@@ -8,14 +8,16 @@ module Main where
 
 import Matrix
 
-import Graphics.UI.GLUT
-import Graphics.Rendering.OpenGL
+import Graphics.UI.GLUT hiding (rect)
+import Graphics.Rendering.OpenGL hiding (rect)
 import Graphics.GLUtil
 import Graphics.Rendering.OpenGL.Raw (glUniformMatrix4fv)
 import Control.Applicative
 import Data.IORef
 import System.Exit
 
+import qualified Control.Monad.State as S
+import Data.Monoid
 import Unsafe.Coerce
 import Foreign.Ptr
 
@@ -50,26 +52,62 @@ data Mesh = Mesh { vertexBuffer :: BufferObject
                  }
 
 
-vertexData :: [V3f]
-vertexData = [
-  v3 (-0.875) (-1.0) (-2.45)
-  , v3 1.875 (-1.0) (-2.45)
-  , v3 1.875 (-1.0) 0.2
-  , v3 (-0.875) (-1.0) 0.2
-  , v3 (-0.875) (-1.0) 0.2
-  , v3 1.875 (-1.0) 0.2
-  , v3 1.875 (-1.0) 0.2
-  , v3 (-0.875) (-1.0) 0.2
-  ]
-elementData :: [GLuint]
-elementData = [0,1,2,0,2,3,4,5,6,4,6,7]
+type ListBuilder a = [a] -> [a]
+data MeshBuilder = MB M4f GLuint (ListBuilder V3f) (ListBuilder GLuint)
+type MeshM = S.State MeshBuilder
+runMesh :: MeshM () -> IO Mesh
+runMesh mesh = do
+  let MB m i vs es = S.execState mesh $ MB identity 0 id id
+  print $ m
+  print $ vs []
+  makeMesh (vs []) (es [])
+
+transform :: M4f -> MeshM ()
+transform m = do
+  MB old_m i vs es <- S.get
+  S.put $ MB (old_m ^*^ m) i vs es
+
+point :: GLfloat -> GLfloat -> GLfloat -> MeshM GLuint
+point a b c = do
+  MB m i vs es <- S.get
+  let transformed = m *^ v4 a b c 1
+      V4 a' b' c' 1 = transformed
+      transformed' = v3 a' b' c'
+  S.put $ MB m (i+1) (vs . (transformed':)) es
+  return i
+
+triangle :: GLuint -> GLuint -> GLuint -> MeshM ()
+triangle a b c = do
+  MB m i vs es <- S.get
+  S.put $ MB m i vs (es . (a:) . (b:) . (c:))
+
+rect a b c d = do
+  triangle a b c
+  triangle a c d
+
+cube :: MeshM ()
+cube = do
+    a <- point 0 0 0
+    b <- point 0 1 0
+    c <- point 1 1 0
+    d <- point 1 0 0
+    a' <- point 0 0 1
+    b' <- point 0 1 0
+    c' <- point 1 1 0
+    d' <- point 1 0 0
+    rect a b c d
+    rect d c c' d'
+    rect d' c' b' a'
+    rect a' b' b a
+    rect a d d' a'
+    rect b b' c' c
 
 
 makeResources :: FilePath -> FilePath -> IO Resources
 makeResources vertexShaderPath fragmentShaderPath =
   let initialCameraPosition = v3 0.5 (-0.25) (-1.25)
   in Resources
-     <$> makeMesh vertexData elementData
+     <$> runMesh cube
      <*> makeShaders vertexShaderPath fragmentShaderPath
      <*> pure initialCameraPosition
      <*> get initialWindowSize

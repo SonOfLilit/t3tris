@@ -58,10 +58,9 @@ testV3 = do
   quickCheck $ \m1 m2 -> m1 ^+ m2 == (m2 ^+ m1 :: M3f)
   quickCheck $ \a m1 m2 -> a^*m1 ^+ a^*m2 ~== (a^*(m1 ^+ m2) :: M3f)
   
-  quickCheck $ \m -> (m :: M3f) *^^ zero ~== zero
-  quickCheck $ \m v1 v2 -> (m :: M3f) *^^ v1 *^^ v2 ~== m *^^ v2 *^^ v1
+  quickCheck $ \m -> (m :: M3f) *^ zero ~== zero
   
-  quickCheck $ \m1 m2 v -> (m1 :: M3f) ^*^ (m2 *^^ v) ~== m1 ^*^ (m2 *^^ v)
+  quickCheck $ \m1 m2 v -> (m1 :: M3f) *^ (m2 *^ v) ~== (m1 ^*^ m2) *^ v
 
 testV4 = do
   quickCheck $ \v -> 0 ^* v == (zero :: V4f)
@@ -79,7 +78,9 @@ testV4 = do
   quickCheck $ \m1 m2 -> m1 ^+ m2 == (m2 ^+ m1 :: M4f)
   quickCheck $ \a m1 m2 -> a^*m1 ^+ a^*m2 ~== (a^*(m1 ^+ m2) :: M4f)
   
-  quickCheck $ \m -> (m :: M4f) *^^ zero ~== zero
-  quickCheck $ \m v1 v2 -> (m :: M4f) *^^ v1 *^^ v2 ~== m *^^ v2 *^^ v1
+  quickCheck $ \m -> (m :: M4f) *^ zero ~== zero
   
-  quickCheck $ \m1 m2 v -> (m1 :: M4f) ^*^ (m2 *^^ v) ~== m1 ^*^ (m2 *^^ v)
+  quickCheck $ \m1 m2 v -> (m1 :: M4f) *^ (m2 *^ v) ~== (m1 ^*^ m2) *^ v
+
+  quickCheck $ \v -> (identity :: M4f) *^ v ~== v
+  quickCheck $ \v a b c -> toList (translationMatrix v *^ v4 a b c 1) !! 3 == 1

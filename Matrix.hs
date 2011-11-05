@@ -20,10 +20,10 @@ class (V t) => Measurable t where
   pythagorean :: t -> GLfloat
 
 class M m v | m -> v where
-  (*^+) :: m -> v -> v
-  (*^^) :: m -> v -> m
+  (*^) :: m -> v -> v
   (^*^) :: m -> m -> m
-infixl 7 *^+
+  identity :: m
+infixl 7 *^
 infixl 5 ^*^
 instance V GLfloat where
   x ^+ y = x + y
@@ -43,9 +43,11 @@ instance (V t) => V (V3 t) where
 instance Measurable V3f where
   pythagorean (V3 x1 x2 x3) = sqrt (x1*x1 + x2*x2 + x3*x3)
 instance M M3f V3f where
-  V3 x y z *^+ V3 a b c = (a ^* x) ^+ (b ^* y) ^+ (c ^* z)
-  V3 x y z *^^ V3 a b c = V3 (a ^* x) (b ^* y) (c ^* z)
-  v ^*^ V3 d e f = V3 (v *^+ d) (v *^+ e) (v *^+ f)
+  V3 x y z *^ V3 a b c = (a ^* x) ^+ (b ^* y) ^+ (c ^* z)
+  v ^*^ V3 d e f = V3 (v *^ d) (v *^ e) (v *^ f)
+  identity = V3 (V3 1 0 0)
+                (V3 0 1 0)
+                (V3 0 0 1)
 
 data V4 a = V4 a a a a deriving (Eq, Show)
 type V4f = V4 GLfloat
@@ -58,10 +60,12 @@ instance (V t) => V (V4 t) where
 instance Measurable V4f where
   pythagorean (V4 x1 x2 x3 x4) = sqrt (x1*x1 + x2*x2 + x3*x3 + x4*x4)
 instance M M4f V4f where
-  v1 *^+ v2 = case (v1 *^^ v2) of 
-    V4 a b c d -> a ^+ b ^+ c ^+ d
-  V4 x y z w *^^ V4 a b c d = V4 (a ^* x) (b ^* y) (c ^* z) (d ^* w)
-  v ^*^ V4 d e f g = V4 (v *^+ d) (v *^+ e) (v *^+ f) (v *^+ g)
+  V4 x y z w *^ V4 a b c d = (a ^* x) ^+ (b ^* y) ^+ (c ^* z) ^+ (d ^* w)
+  v ^*^ V4 d e f g = V4 (v *^ d) (v *^ e) (v *^ f) (v *^ g)
+  identity = V4 (V4 1 0 0 0)
+                (V4 0 1 0 0)
+                (V4 0 0 1 0)
+                (V4 0 0 0 1)
 
 normalize v | v == zero = zero
 normalize v = (1 / pythagorean v) ^* v
@@ -75,6 +79,17 @@ m3 :: V3f -> V3f -> V3f -> M3f
 m3 = V3
 m4 :: V4f -> V4f -> V4f -> V4f -> M4f
 m4 = V4
+
+v4tov3 (V4 a b c 1) = V3 a b c
+v4tov3 v = error $ "Vector is not 3-vector: " ++ show v
+
+translationMatrix :: V3f -> M4f
+translationMatrix (V3 x y z) =
+  m4 (v4 1 0 0 0)
+     (v4 0 1 0 0)
+     (v4 0 0 1 0)
+     (v4 x y z 1)
+
 
 calculateProjectionMatrix :: Size -> M4f
 calculateProjectionMatrix (Size x y) =
@@ -95,8 +110,4 @@ calculateProjectionMatrix (Size x y) =
         (v4 0 0 r_w 0)
 
 calculateModelViewMatrix :: V3f -> M4f
-calculateModelViewMatrix (V3 x y z) =
-  m4 (v4 1 0 0 0)
-     (v4 0 1 0 0)
-     (v4 0 0 1 0)
-     (v4 (-x) (-y) (-z) 1)
+calculateModelViewMatrix v = translationMatrix (-1 ^* v)
